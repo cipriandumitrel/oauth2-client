@@ -1,0 +1,21 @@
+logging:
+  level:
+    org.springframework.web.reactive.function.client.WebClient: DEBUG
+external:
+  uri: https://external_url
+spring:
+  application:
+    name: cdm_client
+  http:
+    log-request-details: true
+  security:
+    oauth2:
+      client:
+        provider:
+          idam:
+            token-uri: "https://idam_token_hostname/authorize/api/oauth2/access_token"
+        registration:
+          idam:
+            client-id: CLIENT_ID
+            client-secret: CLIENT_SECRET
+            authorization-grant-type: client_credentials
