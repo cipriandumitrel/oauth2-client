@@ -4,15 +4,17 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.client.ClientCredentialsReactiveOAuth2AuthorizedClientProvider;
-import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.DelegatingReactiveOAuth2AuthorizedClientProvider;
 import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProvider;
 import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProviderBuilder;
-import org.springframework.security.oauth2.client.endpoint.WebClientReactiveClientCredentialsTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
-import org.springframework.security.oauth2.client.web.DefaultReactiveOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.reactive.function.client.ServerOAuth2AuthorizedClientExchangeFilterFunction;
-import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.server.UnAuthenticatedServerOAuth2AuthorizedClientRepository;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 @Configuration
 @EnableConfigurationProperties(ExternalApiSettings.class)
@@ -54,32 +56,43 @@ public class WebClientOauth2Config {
   }*/
 
   @Bean
-  public WebClient webClient(ReactiveOAuth2AuthorizedClientManager authorizedClientManager) {
-    ServerOAuth2AuthorizedClientExchangeFilterFunction oauth =
-            new ServerOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
-    oauth.setDefaultClientRegistrationId(CLIENT_REGISTRATION_ID);
-    return WebClient.builder()
-            .baseUrl(externalApiSettings.getUri())
-            .filter(oauth)
-            .build();
-  }
+  public WebClient webClientSecurityCustomizer(
+          ReactiveClientRegistrationRepository clientRegistrations) {
 
-  @Bean
-  public ReactiveOAuth2AuthorizedClientManager authorizedClientManager(
-          ReactiveClientRegistrationRepository clientRegistrationRepository,
-          ServerOAuth2AuthorizedClientRepository authorizedClientRepository) {
+    AnonymousReactiveOAuth2AuthorizedClientManager manager =
+            new AnonymousReactiveOAuth2AuthorizedClientManager(clientRegistrations,
+                    new UnAuthenticatedServerOAuth2AuthorizedClientRepository());
 
     ReactiveOAuth2AuthorizedClientProvider authorizedClientProvider =
             ReactiveOAuth2AuthorizedClientProviderBuilder.builder()
-                    .clientCredentials()
+                    .authorizationCode()
+                    .refreshToken()
+                    .clientCredentials(clientCredentialsGrantBuilder ->
+                            clientCredentialsGrantBuilder.accessTokenResponseClient(new IdamReactiveOAuth2AccessTokenResponseClient()))
+                    .password()
                     .build();
 
-    DefaultReactiveOAuth2AuthorizedClientManager authorizedClientManager =
-            new DefaultReactiveOAuth2AuthorizedClientManager(
-                    clientRegistrationRepository, authorizedClientRepository);
+    manager.setAuthorizedClientProvider(authorizedClientProvider);
 
-    authorizedClientManager.setAuthorizedClientProvider(authorizedClientProvider);
+    ServerOAuth2AuthorizedClientExchangeFilterFunction oauth2 =
+            new ServerOAuth2AuthorizedClientExchangeFilterFunction(manager);
 
-    return authorizedClientManager;
+    oauth2.setDefaultClientRegistrationId(CLIENT_REGISTRATION_ID);
+
+    return WebClient.builder()
+            .baseUrl(externalApiSettings.getUri())
+            .filter(oauth2)
+            .build();
+  }
+
+  /**
+   * Helper function to include the Spring CLIENT_REGISTRATION_ID_ATTR_NAME in a
+   * properties Map
+   *
+   * @param provider - OAuth2 authorization provider name
+   * @return consumer properties Map
+   */
+  public static Consumer<Map<String, Object>> getExchangeFilterWith(String provider) {
+    return ServerOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId(provider);
   }
 }

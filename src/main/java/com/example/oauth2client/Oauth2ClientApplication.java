@@ -1,5 +1,7 @@
 package com.example.oauth2client;
 
+import com.example.oauth2client.config.WebClientOauth2Config;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -18,7 +20,7 @@ public class Oauth2ClientApplication {
   }
 }
 
-@Component
+/*@Component
 @Log4j2
 @RequiredArgsConstructor
 class Client {
@@ -43,5 +45,44 @@ class Client {
             .subscribe(entity -> log.info("Entity: " + entity));
   }
 
+}*/
+
+@Component
+@Log4j2
+@RequiredArgsConstructor
+class Client {
+
+  private final WebClient webClient;
+
+  @EventListener(ApplicationReadyEvent.class)
+  public void ready() {
+
+    webClient
+            .get()
+            .uri(uriBuilder -> uriBuilder
+                    .path("/api/v3/{tenant}/{entity}")
+                    .queryParam("view", "flat")
+                    .queryParam("version", "1")
+                    .queryParam("state", "updated")
+                    .queryParam("fromSeq", "70000")
+                    .queryParam("toSeq", "72000")
+                    .build("nl", "contactchannels"))
+            //.attributes(WebClientOauth2Config.getExchangeFilterWith("idam"))
+            .retrieve()
+            .bodyToFlux(String.class)
+            .doOnSubscribe(subscription -> log.info("Connection to security server"))
+            .onErrorMap(err -> {
+              try {
+                // Wait if we receive an error
+                Thread.sleep(100);
+              } catch (InterruptedException e) {
+                log.warn(e.toString());
+              }
+              return err;
+            })
+            .subscribe(str -> log.info("Server response : '{}'", str));
+  }
+
 }
+
 
