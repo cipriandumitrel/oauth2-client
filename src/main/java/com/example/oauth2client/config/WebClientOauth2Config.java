@@ -3,16 +3,15 @@ package com.example.oauth2client.config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.client.ClientCredentialsReactiveOAuth2AuthorizedClientProvider;
-import org.springframework.security.oauth2.client.DelegatingReactiveOAuth2AuthorizedClientProvider;
+import org.springframework.security.oauth2.client.AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProvider;
 import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.reactive.function.client.ServerOAuth2AuthorizedClientExchangeFilterFunction;
 import org.springframework.security.oauth2.client.web.server.UnAuthenticatedServerOAuth2AuthorizedClientRepository;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -57,11 +56,16 @@ public class WebClientOauth2Config {
 
   @Bean
   public WebClient webClientSecurityCustomizer(
-          ReactiveClientRegistrationRepository clientRegistrations) {
+          ReactiveClientRegistrationRepository clientRegistrations,
+          ReactiveOAuth2AuthorizedClientService oAuth2AuthorizedClientService) {
 
-    AnonymousReactiveOAuth2AuthorizedClientManager manager =
+    AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager manager =
+            new AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager(
+                    clientRegistrations, oAuth2AuthorizedClientService);
+
+    /*AnonymousReactiveOAuth2AuthorizedClientManager manager =
             new AnonymousReactiveOAuth2AuthorizedClientManager(clientRegistrations,
-                    new UnAuthenticatedServerOAuth2AuthorizedClientRepository());
+                    new UnAuthenticatedServerOAuth2AuthorizedClientRepository());*/
 
     ReactiveOAuth2AuthorizedClientProvider authorizedClientProvider =
             ReactiveOAuth2AuthorizedClientProviderBuilder.builder()
